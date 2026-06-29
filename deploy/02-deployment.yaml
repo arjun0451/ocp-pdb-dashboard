@@ -42,9 +42,7 @@ spec:
 
       containers:
         - name: pdb-dashboard
-          # Replace with your self-hosted Quay image after push
-          # e.g. quay.your-domain.com/ops/pdb-dashboard:v1.0
-          image: quay.your-domain.com/ops/pdb-dashboard:latest
+          image: quay.io/ocptoolkit/pdb-dashboard:v1
           imagePullPolicy: Always
 
           ports:
@@ -74,8 +72,8 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 1000m
+              memory: 1512Mi
 
           volumeMounts:
             - name: data
@@ -85,7 +83,7 @@ spec:
             httpGet:
               path: /api/summary
               port: 3001
-            initialDelaySeconds: 20
+            initialDelaySeconds: 150
             periodSeconds: 10
             failureThreshold: 3
 
@@ -93,7 +91,7 @@ spec:
             httpGet:
               path: /api/summary
               port: 3001
-            initialDelaySeconds: 30
+            initialDelaySeconds: 150
             periodSeconds: 30
             failureThreshold: 3
 

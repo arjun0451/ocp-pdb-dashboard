@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+    # Allow restricted-v2 SCC (runs as UID 1001, no privilege)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

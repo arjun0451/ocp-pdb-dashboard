@@ -1,0 +1,68 @@
+---
+# ServiceAccount used by the dashboard pod
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pdb-dashboard
+  namespace: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+
+---
+# ClusterRole — read-only on PDBs, pods, nodes
+# Mirrors exactly what the shell script needs via oc get
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pdb-dashboard-reader
+  labels:
+    app: pdb-dashboard
+rules:
+  # Core: pods, nodes
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+      - namespaces
+    verbs: ["get", "list", "watch"]
+
+  # Policy: PodDisruptionBudgets (policy/v1 in OCP 4.9+, also policy/v1beta1 for compat)
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets
+    verbs: ["get", "list", "watch"]
+
+  # policy/v1 (Kubernetes 1.21+ / OCP 4.8+)
+  - apiGroups: ["policy"]
+    resources:
+      - poddisruptionbudgets/status
+    verbs: ["get"]
+
+  # OpenShift project list (for namespace discovery)
+  - apiGroups: ["project.openshift.io"]
+    resources:
+      - projects
+    verbs: ["get", "list"]
+
+  # SelfSubjectAccessReview — whoami equivalent
+  - apiGroups: ["authentication.k8s.io"]
+    resources:
+      - tokenreviews
+    verbs: ["create"]
+
+---
+# Bind ClusterRole to ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pdb-dashboard-reader
+  labels:
+    app: pdb-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pdb-dashboard-reader
+subjects:
+  - kind: ServiceAccount
+    name: pdb-dashboard
+    namespace: pdb-dashboard

@@ -1,0 +1,139 @@
+---
+# PersistentVolumeClaim — SQLite history DB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pdb-dashboard-data
+  namespace: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdb-dashboard
+  namespace: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pdb-dashboard
+  strategy:
+    type: Recreate            # single replica + RWO PVC
+  template:
+    metadata:
+      labels:
+        app: pdb-dashboard
+    spec:
+      serviceAccountName: pdb-dashboard
+
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: pdb-dashboard
+          # Replace with your self-hosted Quay image after push
+          # e.g. quay.your-domain.com/ops/pdb-dashboard:v1.0
+          image: quay.your-domain.com/ops/pdb-dashboard:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: REFRESH_SECONDS
+              value: "30"
+            - name: DB_PATH
+              value: /app/data/pdb_history.db
+            - name: OC_BIN
+              value: /usr/local/bin/oc
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+
+          readinessProbe:
+            httpGet:
+              path: /api/summary
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /api/summary
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pdb-dashboard-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdb-dashboard
+  namespace: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+spec:
+  selector:
+    app: pdb-dashboard
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+      protocol: TCP
+
+---
+# OpenShift Route — HTTPS edge termination
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: pdb-dashboard
+  namespace: pdb-dashboard
+  labels:
+    app: pdb-dashboard
+spec:
+  to:
+    kind: Service
+    name: pdb-dashboard
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
